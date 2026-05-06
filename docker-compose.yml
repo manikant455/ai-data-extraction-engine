@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: scraper-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: scraper-redis
+    ports:
+      - "6379:6379"
+
+  api:
+    build: .
+    container_name: scraper-api
+    ports:
+      - "8002:8002"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    depends_on:
+      - mongodb
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: scraper-worker
+    command: celery -A app.workers.tasks worker --loglevel=info
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - mongodb
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
